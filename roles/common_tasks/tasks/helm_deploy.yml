@@ -1,0 +1,73 @@
+---
+- name: Set temp directory path
+  ansible.builtin.set_fact:
+    temp_dir: "/tmp/ansible-nexus-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+
+- name: Create temp directory
+  ansible.builtin.file:
+    path: "{{ temp_dir }}"
+    state: directory
+    mode: '0777'
+
+- name: Helm provision - Generate values.yaml
+  ansible.builtin.template:
+    src: "values.yaml.j2"
+    dest: "{{ temp_dir }}/values.yaml"
+    mode: "644"
+
+- name: Add Helm repository
+  ansible.builtin.shell:
+    cmd: "helm repo add nexus {{ item.helm_chart_repository }} || true && helm repo update"
+  changed_when: false
+  when: not (item.chart_ref.startswith('../') or item.chart_ref.startswith('./') or item.chart_ref.startswith('/'))
+
+- name: Install or upgrade release from repository
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install {{ item.name }}
+      {% if item.chart_ref.startswith('../') or item.chart_ref.startswith('./') or item.chart_ref.startswith('/') %}
+      {{ item.chart_ref }}
+      {% else %}
+      nexus/{{ item.chart_ref }}
+      {% endif %}
+      {% if not (item.chart_ref.startswith('../') or item.chart_ref.startswith('./') or item.chart_ref.startswith('/')) %}
+      --version {{ item.chart_version }}
+      {% endif %}
+      -f {{ temp_dir }}/values.yaml
+      -n {{ item.namespace }}
+      --create-namespace
+  changed_when: false
+  environment:
+    HELM_USERNAME: "{{ common_tasks_helm_username }}"
+    HELM_PASSWORD: "{{ common_tasks_helm_password }}"
+  when: not (item.chart_ref.startswith('../') or item.chart_ref.startswith('./') or item.chart_ref.startswith('/'))
+
+- name: Install or upgrade release from local chart
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install {{ item.name }}
+      {{ item.chart_ref }}
+      -f {{ temp_dir }}/values.yaml
+      -n {{ item.namespace }}
+      --create-namespace
+  changed_when: false
+  when: item.chart_ref.startswith('../') or item.chart_ref.startswith('./') or item.chart_ref.startswith('/')
+
+- name: "K8s wait for rollout"
+  kubernetes.core.k8s_info:
+    kind: Rollout
+    namespace: "{{ item.namespace }}"
+    name: "deploy/{{ item.name }}"
+    wait: true
+    wait_condition:
+      type: Succeeded
+
+- name: Helm provision - Delete values.yaml
+  ansible.builtin.file:
+    path: "{{ temp_dir }}/values.yaml"
+    state: absent
+
+- name: Helm provision - Delete temp directory
+  ansible.builtin.file:
+    path: "{{ temp_dir }}"
+    state: absent

@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  author: CI/CD Team
+  description: Test role for validating Jenkins, Nexus, and GitLab deployments
+  company: Organization
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - cicd
+    - testing
+    - kubernetes
+    - jenkins
+    - nexus
+    - gitlab
+    - pytest
+
+dependencies: []

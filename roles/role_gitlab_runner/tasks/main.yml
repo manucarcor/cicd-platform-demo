@@ -1,0 +1,34 @@
+---
+- name: Verify GitLab is running and get registration token
+  ansible.builtin.include_tasks: verify_gitlab.yml
+
+- name: Cleanup previous installation
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_cleanup.yml"
+  vars:
+    helm_release_name: "{{ gitlab_runner_app_name }}"
+    target_namespace: "{{ gitlab_runner_namespace }}"
+
+- name: Create namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ gitlab_runner_namespace }}"
+    state: present
+
+# Copy TLS certificate secret if TLS is enabled
+- name: Copy TLS certificate
+  ansible.builtin.include_tasks: roles/common_tasks/tasks/create_tls_certificate.yml
+  vars:
+    tls_enabled: "{{ gitlab_runner_tls_enabled | default(false) }}"
+    target_namespace: "{{ gitlab_runner_namespace }}"
+    tls_secret_name: "{{ gitlab_runner_tls_secret_name | default('gitlab-runner-tls-cert') }}"
+  when: gitlab_runner_tls_enabled | default(false) | bool
+
+- name: Include tasks helm deploy
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_deploy.yml"
+  loop:
+    - name: "{{ gitlab_runner_app_name }}"
+      namespace: "{{ gitlab_runner_namespace }}"
+      chart_ref: "{{ gitlab_runner_chart_ref }}"
+      helm_chart_repository: "{{ gitlab_runner_helm_chart_repository }}"
+      chart_version: "{{ gitlab_runner_chart_version }}"

@@ -1,0 +1,155 @@
+# GitLab Runner configuration
+gitlabUrl: "{{ gitlab_runner_gitlab_url | default('https://gitlab.' + cluster_domain + '/') }}"
+gitlabdns: {{ gitlab_runner_gitlab_dns | default('gitlab.' + cluster_domain) }}
+gitlabip: "{{ gitlab_runner_gitlab_ip | default('') }}"
+runnerToken: "{{ gitlab_runner_token }}"
+tls:
+  enabled: {{ gitlab_runner_tls_enabled | default(false) }}
+  ca: {{ gitlab_runner_tls_ca | default('') }}
+  cacert: |
+{{ gitlab_runner_tls_cacert | default('') | indent(4, false) }}
+
+# Runner configuration
+runners:
+  name: "{{ gitlab_runner_name | default('gitlab-runner') }}"
+  tags: "{{ gitlab_runner_tags | default('kubernetes,docker') }}"
+  runUntagged: {{ gitlab_runner_run_untagged | default(true) }}
+  protected: {{ gitlab_runner_protected | default(false) }}
+  secret: {{ gitlab_runner_secret_name | default("gitlab-runner-secret") }}
+  cache: {{ gitlab_runner_cache | default({}) }}
+  builds: {{ gitlab_runner_builds | default({}) }}
+  services: {{ gitlab_runner_services | default({}) }}
+  helpers: {{ gitlab_runner_helpers | default({}) }}
+  # Request concurrency
+  requestConcurrency: {{ gitlab_runner_request_concurrency | default(10) }}
+
+  # Kubernetes executor configuration
+  executor: "{{ gitlab_runner_executor | default('kubernetes') }}"
+
+  # Environment variables
+  env:
+    - name: "KUBERNETES_NAMESPACE"
+      value: "{{ gitlab_runner_namespace | default('gitlab-runner') }}"
+    - name: "KUBERNETES_POLL_TIMEOUT"
+      value: "{{ gitlab_runner_poll_timeout | default(180) }}"
+    - name: "KUBERNETES_CPU_LIMIT"
+      value: "{{ gitlab_runner_job_cpu_limit | default('1000m') }}"
+    - name: "KUBERNETES_MEMORY_LIMIT"
+      value: "{{ gitlab_runner_job_memory_limit | default('1Gi') }}"
+    - name: "KUBERNETES_CPU_REQUEST"
+      value: "{{ gitlab_runner_job_cpu_request | default('100m') }}"
+    - name: "KUBERNETES_MEMORY_REQUEST"
+      value: "{{ gitlab_runner_job_memory_request | default('128Mi') }}"
+    - name: "KUBERNETES_SERVICE_CPU_LIMIT"
+      value: "{{ gitlab_runner_service_cpu_limit | default('200m') }}"
+    - name: "KUBERNETES_SERVICE_MEMORY_LIMIT"
+      value: "{{ gitlab_runner_service_memory_limit | default('256Mi') }}"
+    - name: "KUBERNETES_SERVICE_CPU_REQUEST"
+      value: "{{ gitlab_runner_service_cpu_request | default('100m') }}"
+    - name: "KUBERNETES_SERVICE_MEMORY_REQUEST"
+      value: "{{ gitlab_runner_service_memory_request | default('128Mi') }}"
+    - name: "KUBERNETES_HELPER_CPU_LIMIT"
+      value: "{{ gitlab_runner_helper_cpu_limit | default('200m') }}"
+    - name: "KUBERNETES_HELPER_MEMORY_LIMIT"
+      value: "{{ gitlab_runner_helper_memory_limit | default('256Mi') }}"
+    - name: "KUBERNETES_HELPER_CPU_REQUEST"
+      value: "{{ gitlab_runner_helper_cpu_request | default('100m') }}"
+    - name: "KUBERNETES_HELPER_MEMORY_REQUEST"
+      value: "{{ gitlab_runner_helper_memory_request | default('128Mi') }}"
+
+# Image configuration
+image:
+  registry: {{ gitlab_runner_image_registry | default("registry.gitlab.com") }}
+  image: {{ gitlab_runner_image_repository | default("gitlab-org/gitlab-runner") }}
+  tag: "{{ gitlab_runner_image_tag | default('latest') }}"
+  pullPolicy: {{ gitlab_runner_image_pull_policy | default("IfNotPresent") }}
+  secret:
+    registry: {{ gitlab_runner_image_secret_registry | default("docker.io") }}
+    enabled: {{ gitlab_runner_image_secret_enabled | default(false) }}
+    existing: "{{ gitlab_runner_image_secret_existing | default('') }}"
+
+## Liveness probe configuration
+livenessProbe:
+  initialDelaySeconds: {{ gitlab_runner_liveness_probe_initial_delay | default(40) }}
+  periodSeconds: {{ gitlab_runner_liveness_probe_period | default(10) }}
+  timeoutSeconds: {{ gitlab_runner_liveness_probe_timeout | default(10) }}
+  failureThreshold: {{ gitlab_runner_liveness_probe_failure_threshold | default(3) }}
+  successThreshold: {{ gitlab_runner_liveness_probe_success_threshold | default(1) }}
+## Readiness probe configuration
+readinessProbe:
+  initialDelaySeconds: {{ gitlab_runner_readiness_probe_initial_delay | default(50) }}
+  periodSeconds: {{ gitlab_runner_readiness_probe_period | default(30) }}
+  timeoutSeconds: {{ gitlab_runner_readiness_probe_timeout | default(5) }}
+  failureThreshold: {{ gitlab_runner_readiness_probe_failure_threshold | default(15) }}
+  successThreshold: {{ gitlab_runner_readiness_probe_success_threshold | default(1) }}
+
+# Service account and RBAC
+rbac:
+  create: {{ gitlab_runner_rbac_create | default(true) }}
+  rules: []
+  clusterWideAccess: {{ gitlab_runner_cluster_wide_access | default(false) }}
+  podSecurityPolicy:
+    enabled: {{ gitlab_runner_psp_enabled | default(false) }}
+    resourceNames: []
+
+serviceAccount:
+  create: {{ gitlab_runner_service_account_create | default(true) }}
+  annotations: {{ gitlab_runner_service_account_annotations | default({}) }}
+  name: "{{ gitlab_runner_service_account_name | default('') }}"
+  imagePullSecrets: []
+
+# Deployment configuration
+replicaCount: {{ gitlab_runner_replica_count | default(1) }}
+
+# Resources
+resources:
+  limits:
+    memory: {{ gitlab_runner_resources_limits_memory | default("256Mi") }}
+    cpu: {{ gitlab_runner_resources_limits_cpu | default("200m") }}
+  requests:
+    memory: {{ gitlab_runner_resources_requests_memory | default("128Mi") }}
+    cpu: {{ gitlab_runner_resources_requests_cpu | default("100m") }}
+
+# Node selector and tolerations
+nodeSelector: {{ gitlab_runner_node_selector | default({}) }}
+tolerations: {{ gitlab_runner_tolerations | default([]) }}
+affinity: {{ gitlab_runner_affinity | default({}) }}
+
+# Pod security context
+podSecurityContext:
+  runAsUser: {{ gitlab_runner_run_as_user | default(999) }}
+  runAsGroup: {{ gitlab_runner_run_as_group | default(999) }}
+  runAsNonRoot: {{ gitlab_runner_run_as_non_root | default(true) }}
+  fsGroup: {{ gitlab_runner_fs_group | default(999) }}
+
+securityContext:
+  allowPrivilegeEscalation: {{ gitlab_runner_allow_privilege_escalation | default(false) }}
+  readOnlyRootFilesystem: {{ gitlab_runner_read_only_root_filesystem | default(false) }}
+  runAsNonRoot: {{ gitlab_runner_run_as_non_root | default(true) }}
+  runAsUser: {{ gitlab_runner_run_as_user | default(999) }}
+  capabilities:
+    drop:
+      - ALL
+
+# Logging
+logLevel: {{ gitlab_runner_log_level | default("info") }}
+logFormat: "{{ gitlab_runner_log_format | default('runner') }}"
+
+# Metrics
+metrics:
+  enabled: {{ gitlab_runner_metrics_enabled | default(false) }}
+  port: {{ gitlab_runner_metrics_port | default(9252) }}
+  serviceMonitor:
+    enabled: {{ gitlab_runner_service_monitor_enabled | default(false) }}
+
+# Pod annotations
+podAnnotations: {{ gitlab_runner_pod_annotations | default({}) }}
+
+# Pod labels
+podLabels: {{ gitlab_runner_pod_labels | default({}) }}
+
+# Environment variables
+envVars: {{ gitlab_runner_env_vars | default([]) }}
+
+# Configuration template
+configToml:

@@ -1,0 +1,25 @@
+---
+- name: Copy TLS certificate for application ingress
+  kubernetes.core.k8s:
+    state: present
+    resource_definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ tls_secret_name }}"
+        namespace: "{{ target_namespace | default(namespace) }}"
+      type: kubernetes.io/tls
+      data:
+        tls.crt: >-
+          {{ lookup('kubernetes.core.k8s',
+              api_version='v1',
+              kind='Secret',
+              namespace='kube-system',
+              resource_name='rke2-serving')['data']['tls.crt'] }}
+        tls.key: >-
+          {{ lookup('kubernetes.core.k8s',
+              api_version='v1',
+              kind='Secret',
+              namespace='kube-system',
+              resource_name='rke2-serving')['data']['tls.key'] }}
+  when: tls_enabled | default(false) | bool

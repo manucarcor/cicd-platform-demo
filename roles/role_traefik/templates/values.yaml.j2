@@ -1,0 +1,185 @@
+# Traefik Chart Values
+## Number of replicas
+replicaCount: {{ traefik_replica_count | default(1) }}
+## Namespace
+namespace: {{ traefik_namespace }}
+## Override the namespace
+namespaceOverride: "{{ traefik_namespace_override | default('') }}"
+## fullnameOverride
+fullnameOverride: "{{ traefik_fullname_override | default('') }}"
+## App name
+app:
+  name: {{ traefik_app_name | default("traefik") }}
+domain: {{ cluster_domain }}
+
+## Traefik Image
+image:
+  repository: {{ traefik_image_repository | default("traefik") }}
+  tag: "{{ traefik_image_tag | default('3.1.4') }}"
+  pullPolicy: {{ traefik_image_pull_policy | default("IfNotPresent") }}
+  secret:
+    registry: {{ traefik_image_registry | default("docker.io") }}
+    enabled: {{ traefik_image_secret_enabled | default(false) }}
+    existing: "{{ traefik_image_secret_existing | default('') }}"
+
+## Persistence section
+persistence:
+  mounts:
+    traefik-data:
+      enabled: {{ traefik_persistence_enabled | default(true) }}
+      size: {{ traefik_persistence_size | default("1Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ traefik_persistence_access_mode | default("ReadWriteOnce") }}
+      annotations: {}
+      mountPath: "{{ traefik_persistence_mount_path | default('/data') }}"
+      existingClaim: "{{ traefik_persistence_existing_claim | default('') }}"
+  persistentVolumeClaimRetentionPolicy:
+    enabled: {{ traefik_pvc_retention_policy_enabled | default(true) }}
+    whenDeleted: "{{ traefik_pvc_retention_when_deleted | default('Retain') }}"
+    whenScaled: "{{ traefik_pvc_retention_when_scaled | default('Retain') }}"
+
+## Service configuration
+service:
+  type: {{ traefik_service_type | default("LoadBalancer") }}
+  loadBalancerIP: "{{ traefik_load_balancer_ip | default('') }}"
+  externalTrafficPolicy: {{ traefik_external_traffic_policy | default("Cluster") }}
+
+## Port configuration
+ports:
+  web: {{ traefik_port_web | default(80) }}
+  websecure: {{ traefik_port_websecure | default(443) }}
+  traefik: {{ traefik_port_traefik | default(8080) }}
+
+## Ingress for dashboard
+ingress:
+  enabled: {{ traefik_ingress_enabled | default(false) }}
+  service_domains:
+{% if traefik_ingress_domains is defined %}
+{% for domain in traefik_ingress_domains %}
+    - name: {{ domain }}
+{% endfor %}
+{% else %}
+    - name: traefik.{{ cluster_domain }}
+{% endif %}
+  tls:
+    enabled: {{ traefik_ingress_tls_enabled | default(false) }}
+    secretName: {{ traefik_ingress_tls_secret | default("") }}
+  backend:
+    service:
+      port: {{ traefik_ingress_backend_port | default(8080) }}
+
+## Resources limits and requests
+resources:
+  limits:
+    cpu: "{{ traefik_resources_limits_cpu | default('1000m') }}"
+    memory: "{{ traefik_resources_limits_memory | default('1Gi') }}"
+  requests:
+    cpu: "{{ traefik_resources_requests_cpu | default('500m') }}"
+    memory: "{{ traefik_resources_requests_memory | default('512Mi') }}"
+
+## Security context
+podSecurityContext:
+  runAsUser: {{ traefik_run_as_user | default(65532) }}
+  runAsGroup: {{ traefik_run_as_group | default(65532) }}
+  fsGroup: {{ traefik_fs_group | default(65532) }}
+  runAsNonRoot: {{ traefik_run_as_non_root | default(true) }}
+
+securityContext:
+  allowPrivilegeEscalation: {{ traefik_allow_privilege_escalation | default(false) }}
+  readOnlyRootFilesystem: {{ traefik_read_only_root_filesystem | default(true) }}
+  runAsNonRoot: {{ traefik_run_as_non_root | default(true) }}
+  runAsUser: {{ traefik_run_as_user | default(65532) }}
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+
+## Liveness probe configuration
+livenessProbe:
+  enabled: {{ traefik_liveness_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ traefik_liveness_probe_path | default('/ping') }}"
+    port: {{ traefik_port_traefik | default(8080) }}
+  initialDelaySeconds: {{ traefik_liveness_probe_initial_delay | default(10) }}
+  periodSeconds: {{ traefik_liveness_probe_period | default(10) }}
+  timeoutSeconds: {{ traefik_liveness_probe_timeout | default(5) }}
+  failureThreshold: {{ traefik_liveness_probe_failure_threshold | default(3) }}
+  successThreshold: {{ traefik_liveness_probe_success_threshold | default(1) }}
+
+## Readiness probe configuration
+readinessProbe:
+  enabled: {{ traefik_readiness_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ traefik_readiness_probe_path | default('/ping') }}"
+    port: {{ traefik_port_traefik | default(8080) }}
+  initialDelaySeconds: {{ traefik_readiness_probe_initial_delay | default(10) }}
+  periodSeconds: {{ traefik_readiness_probe_period | default(10) }}
+  timeoutSeconds: {{ traefik_readiness_probe_timeout | default(5) }}
+  failureThreshold: {{ traefik_readiness_probe_failure_threshold | default(3) }}
+  successThreshold: {{ traefik_readiness_probe_success_threshold | default(1) }}
+
+## Update strategy
+updateStrategy:
+  type: {{ traefik_update_strategy | default("RollingUpdate") }}
+
+## Traefik configuration
+conf:
+  # Environment variables
+  env:
+    TZ: "{{ traefik_timezone | default('Europe/Madrid') }}"
+  # Traefik static configuration
+  traefik:
+    api:
+      dashboard: {{ traefik_dashboard_enabled | default(true) }}
+      insecure: {{ traefik_dashboard_insecure | default(true) }}
+    ping:
+      enabled: {{ traefik_ping_enabled | default(true) }}
+    log:
+      level: "{{ traefik_log_level | default('INFO') }}"
+    accessLog:
+      enabled: {{ traefik_access_log_enabled | default(true) }}
+    entryPoints:
+      web:
+        address: ":{{ traefik_port_web | default(80) }}"
+      websecure:
+        address: ":{{ traefik_port_websecure | default(443) }}"
+      traefik:
+        address: ":{{ traefik_port_traefik | default(8080) }}"
+    providers:
+      kubernetesIngress:
+        enabled: {{ traefik_k8s_ingress_enabled | default(true) }}
+      kubernetesCRD:
+        enabled: {{ traefik_k8s_crd_enabled | default(false) }}
+
+## RBAC Configuration
+rbac:
+  create: {{ traefik_rbac_create | default(true) }}
+
+## ServiceAccount Configuration
+serviceAccount:
+  create: {{ traefik_service_account_create | default(true) }}
+  automount: {{ traefik_service_account_automount | default(true) }}
+  annotations: {{ traefik_service_account_annotations | default({}) }}
+  name: "{{ traefik_service_account_name | default('') }}"
+
+## Node labels for pod assignment
+nodeSelector: {{ traefik_node_selector | default({}) }}
+
+## Tolerations for pod assignment
+tolerations: {{ traefik_tolerations | default([]) }}
+
+## Nodename for pod assignment
+nodeName: "{{ traefik_node_name | default('') }}"
+
+## Affinity for pod assignment
+affinity: {{ traefik_affinity | default({}) }}
+
+## Pod management policy
+podManagementPolicy: "{{ traefik_pod_management_policy | default('Parallel') }}"
+
+## Jenkins integration annotations
+jenkins:
+  pipeline: "{{ traefik_pipeline | default('') }}"
+  buildNumber: "{{ traefik_build_number | default('') }}"

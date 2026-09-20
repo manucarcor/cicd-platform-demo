@@ -1,0 +1,3 @@
+common_tasks_values_path: "/tmp"
+common_tasks_helm_username: ""
+common_tasks_helm_password: ""

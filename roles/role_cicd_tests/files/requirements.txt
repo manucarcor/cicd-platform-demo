@@ -1,0 +1,6 @@
+pytest
+pytest-testinfra
+requests
+kubernetes
+docker
+testinfra

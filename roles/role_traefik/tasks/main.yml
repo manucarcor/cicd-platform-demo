@@ -1,0 +1,32 @@
+---
+- name: Cleanup previous installation
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_cleanup.yml"
+  vars:
+    helm_release_name: "{{ traefik_app_name }}"
+    target_namespace: "{{ traefik_namespace }}"
+
+- name: Create namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ traefik_namespace }}"
+    state: present
+
+# Copy TLS certificate secret if TLS is enabled
+- name: Copy TLS certificate
+  ansible.builtin.include_tasks: roles/common_tasks/tasks/create_tls_certificate.yml
+  vars:
+    tls_enabled: "{{ traefik_tls_enabled | default(false) }}"
+    target_namespace: "{{ traefik_namespace }}"
+    tls_secret_name: "{{ traefik_tls_secret_name | default('traefik-tls-cert') }}"
+  when: traefik_tls_enabled | default(false) | bool
+
+
+- name: Include tasks helm deploy
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_deploy.yml"
+  loop:
+    - name: "{{ traefik_app_name }}"
+      namespace: "{{ traefik_namespace }}"
+      chart_ref: "{{ traefik_chart_ref }}"
+      helm_chart_repository: "{{ traefik_helm_chart_repository }}"
+      chart_version: "{{ traefik_chart_version }}"

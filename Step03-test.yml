@@ -1,0 +1,42 @@
+---
+# Step 03 - CI/CD Services Testing Playbook
+# Executes pytest-based tests for Jenkins, Nexus, and GitLab deployments
+
+- name: Test Jenkins deployment
+  hosts: localhost
+  gather_facts: false
+  tags:
+    - jenkins
+    - tests
+  tasks:
+    - name: Run Jenkins tests
+      ansible.builtin.include_role:
+        name: role_cicd_tests
+      vars:
+        role_cicd_tests_test_target: jenkins
+
+- name: Test Nexus deployment
+  hosts: localhost
+  gather_facts: false
+  tags:
+    - nexus
+    - tests
+  tasks:
+    - name: Run Nexus tests
+      ansible.builtin.include_role:
+        name: role_cicd_tests
+      vars:
+        role_cicd_tests_test_target: nexus
+
+- name: Test GitLab deployment
+  hosts: localhost
+  gather_facts: false
+  tags:
+    - gitlab
+    - tests
+  tasks:
+    - name: Run GitLab tests
+      ansible.builtin.include_role:
+        name: role_cicd_tests
+      vars:
+        role_cicd_tests_test_target: gitlab

@@ -1,0 +1,161 @@
+# Default values for nexus-chart
+## Replica count
+replicaCount: {{ nexus_replica_count | default(1) }}
+## Namespace override
+namespaceOverride: "{{ nexus_namespace | default('') }}"
+## Application configuration
+app:
+  name: {{ nexus_app_name | default("nexus") }}
+## Image configuration
+image:
+  repository: {{ nexus_image_repository | default("sonatype/nexus3") }}
+  tag: "{{ nexus_image_tag | default('3.75.1') }}"
+  pullPolicy: {{ nexus_image_pull_policy | default("IfNotPresent") }}
+  secret:
+    enabled: {{ nexus_image_secret_enabled | default(false) }}
+    registry: {{ nexus_image_registry | default("docker.io") }}
+    username: "{{ nexus_image_secret_username | default('') }}"
+    password: "{{ nexus_image_secret_password | default('') }}"
+    existing: "{{ nexus_image_secret_existing | default('') }}"
+## Admin credentials
+admin:
+  username: {{ nexus_admin_username | default("admin") }}
+  # Initial admin password - will be reset on first boot
+  password: "{{ nexus_admin_password | default('admin123') }}"
+## Service configuration
+service:
+  type: {{ nexus_service_type | default("ClusterIP") }}
+## Ports
+ports:
+  http: {{ nexus_port_http | default(8081) }}
+  https: {{ nexus_port_https | default(8443) }}
+  docker: {{ nexus_port_docker | default(5000) }}
+http:
+  scheme: {{ nexus_http_scheme | default("HTTP") }}
+## Ingress configuration
+ingress:
+  enabled: {{ nexus_ingress_enabled | default(true) }}
+  ingressController: "{{ nexus_ingress_controller | default('nginx') }}"
+  pathType: "{{ nexus_ingress_path_type | default('Prefix') }}"
+  path: "{{ nexus_ingress_path | default('/') }}"
+  service_domains:
+{% if nexus_ingress_domains is defined %}
+{% for domain in nexus_ingress_domains %}
+    - name: {{ domain }}
+{% endfor %}
+{% else %}
+    - name: nexus.{{ cluster_domain }}
+{% endif %}
+  tls:
+    enabled: {{ nexus_ingress_tls_enabled | default(true) }}
+    secretName: {{ nexus_ingress_tls_secret | default("tls-certificates-nexus") }}
+  backend:
+    service:
+      port: {{ nexus_ingress_backend_port | default(8443) }}
+## Environment variables
+conf:
+  env:
+    TZ: "{{ nexus_timezone | default('Europe/Madrid') }}"
+    INSTALL4J_ADD_VM_PARAMS: "{{ nexus_jvm_params | default('-Xms2703m -Xmx2703m -XX:MaxDirectMemorySize=2703m -Djava.util.prefs.userRoot=/nexus-data/javaprefs') }}"
+  # TLS Configuration (for internal HTTPS)
+  tls:
+    enabled: {{ nexus_tls_enabled | default(false) }}
+    secret_name: "{{ nexus_tls_secret_name | default('tls-certificates-nexus') }}"
+    existingSecret: "{{ nexus_tls_existing_secret | default('') }}"
+    keystorePassword: "{{ nexus_tls_keystore_password | default('changeit') }}"
+    cert_file: "{{ nexus_tls_cert_file | default('') }}"
+    key_file: "{{ nexus_tls_key_file | default('') }}"
+## Security Context
+podSecurityContext:
+  runAsUser: {{ nexus_run_as_user | default(200) }}
+  runAsGroup: {{ nexus_run_as_group | default(200) }}
+  fsGroup: {{ nexus_fs_group | default(200) }}
+## Probes configuration
+startupProbe:
+  enabled: {{ nexus_startup_probe_enabled | default(true) }}
+  initialDelaySeconds: {{ nexus_startup_probe_initial_delay | default(30) }}
+  periodSeconds: {{ nexus_startup_probe_period | default(10) }}
+  timeoutSeconds: {{ nexus_startup_probe_timeout | default(5) }}
+  successThreshold: {{ nexus_startup_probe_success_threshold | default(1) }}
+  failureThreshold: {{ nexus_startup_probe_failure_threshold | default(30) }}
+  httpGet:
+    path: {{ nexus_startup_probe_path | default("/service/rest/v1/status/writable") }}
+    port: {{ nexus_port_http | default(8081) }}
+    scheme: {{ nexus_http_scheme | default("HTTP") }}
+livenessProbe:
+  enabled: {{ nexus_liveness_probe_enabled | default(true) }}
+  initialDelaySeconds: {{ nexus_liveness_probe_initial_delay | default(120) }}
+  periodSeconds: {{ nexus_liveness_probe_period | default(30) }}
+  timeoutSeconds: {{ nexus_liveness_probe_timeout | default(5) }}
+  successThreshold: {{ nexus_liveness_probe_success_threshold | default(1) }}
+  failureThreshold: {{ nexus_liveness_probe_failure_threshold | default(5) }}
+  httpGet:
+    path: {{ nexus_liveness_probe_path | default("/service/rest/v1/status") }}
+    port: {{ nexus_port_http | default(8081) }}
+    scheme: {{ nexus_http_scheme | default("HTTP") }}
+readinessProbe:
+  enabled: {{ nexus_readiness_probe_enabled | default(true) }}
+  initialDelaySeconds: {{ nexus_readiness_probe_initial_delay | default(60) }}
+  periodSeconds: {{ nexus_readiness_probe_period | default(10) }}
+  timeoutSeconds: {{ nexus_readiness_probe_timeout | default(5) }}
+  successThreshold: {{ nexus_readiness_probe_success_threshold | default(1) }}
+  failureThreshold: {{ nexus_readiness_probe_failure_threshold | default(3) }}
+  httpGet:
+    path: {{ nexus_readiness_probe_path | default("/service/rest/v1/status/writable") }}
+    port: {{ nexus_port_http | default(8081) }}
+    scheme: {{ nexus_http_scheme | default("HTTP") }}
+## Resources
+resources:
+  limits:
+    cpu: "{{ nexus_resources_limits_cpu | default('2') }}"
+    memory: {{ nexus_resources_limits_memory | default("4Gi") }}
+  requests:
+    cpu: "{{ nexus_resources_requests_cpu | default('1') }}"
+    memory: {{ nexus_resources_requests_memory | default("2Gi") }}
+## Persistence configuration
+persistence:
+  persistentVolumeClaimRetentionPolicy:
+    enabled: {{ nexus_pvc_retention_policy_enabled | default(true) }}
+    whenDeleted: {{ nexus_pvc_retention_when_deleted | default("Retain") }}
+    whenScaled: {{ nexus_pvc_retention_when_scaled | default("Retain") }}
+  mounts:
+    nexus-data:
+      enabled: {{ nexus_persistence_enabled | default(true) }}
+      size: {{ nexus_persistence_size | default("100Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ nexus_persistence_access_mode | default("ReadWriteOnce") }}
+      mountPath: {{ nexus_persistence_mount_path | default("/nexus-data") }}
+      existingClaim: "{{ nexus_persistence_existing_claim | default('') }}"
+## Update strategy
+updateStrategy:
+  type: {{ nexus_update_strategy | default("RollingUpdate") }}
+## RBAC Configuration
+rbac:
+  create: {{ nexus_rbac_create | default(false) }}
+## ServiceAccount Configuration
+serviceAccount:
+  create: {{ nexus_service_account_create | default(true) }}
+  automount: {{ nexus_service_account_automount | default(true) }}
+  annotations: {{ nexus_service_account_annotations | default({}) }}
+  name: "{{ nexus_service_account_name | default('') }}"
+## Node labels for pod assignment
+nodeSelector: {{ nexus_node_selector | default({}) }}
+## Tolerations for pod assignment
+tolerations: {{ nexus_tolerations | default([]) }}
+## Nodename for pod assignment
+nodeName: "{{ nexus_node_name | default('') }}"
+## Affinity for pod assignment
+affinity: {{ nexus_affinity | default({}) }}
+## Pod management policy
+podManagementPolicy: "{{ nexus_pod_management_policy | default('Parallel') }}"
+## Zabbix monitoring
+zabbix:
+  enabled: {{ nexus_zabbix_enabled | default(false) }}
+  repository_name: "{{ nexus_zabbix_repository_name | default('') }}"
+  repository_port: "{{ nexus_zabbix_repository_port | default('') }}"
+  zabbix_url: "{{ nexus_zabbix_url | default('') }}"
+## Jenkins metadata (optional)
+jenkins:
+  pipeline: "{{ nexus_pipeline | default('') }}"
+  buildNumber: "{{ nexus_build_number | default('') }}"

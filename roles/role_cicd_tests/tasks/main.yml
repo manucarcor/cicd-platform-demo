@@ -1,0 +1,83 @@
+---
+# CI/CD Services Test Role - Main Tasks
+# Auto-discovers target service (jenkins, nexus, gitlab), finds pods, executes pytest tests
+
+- name: Resolve test target
+  ansible.builtin.set_fact:
+    effective_test_target: "{{ role_cicd_tests_test_target | default(inventory_hostname | default('jenkins')) }}"
+
+- name: Display test target
+  ansible.builtin.debug:
+    msg: "Running tests for target: {{ effective_test_target }}"
+
+- name: Auto-resolve namespace for target
+  ansible.builtin.set_fact:
+    effective_kube_ns: >-
+      {{
+        kube_ns | default({
+          'jenkins': 'jenkins',
+          'nexus': 'nexus',
+          'gitlab': 'gitlab'
+        }[effective_test_target] | default('default'))
+      }}
+
+- name: Display resolved namespace
+  ansible.builtin.debug:
+    msg: "Using namespace: {{ effective_kube_ns }}"
+
+- name: Auto-discover pod for target in namespace
+  ansible.builtin.shell: >-
+    kubectl get pods -n {{ effective_kube_ns }}
+    -l app.kubernetes.io/name={{ effective_test_target }}-chart
+    --field-selector=status.phase=Running
+    -o jsonpath='{.items[0].metadata.name}'
+  register: discovered_pod
+  changed_when: false
+  failed_when: discovered_pod.rc != 0 or discovered_pod.stdout == ''
+  delegate_to: localhost
+  run_once: true
+
+- name: Display discovered pod
+  ansible.builtin.debug:
+    msg: "Found pod: {{ discovered_pod.stdout }}"
+
+- name: Set effective pod name
+  ansible.builtin.set_fact:
+    effective_kube_pod: "{{ discovered_pod.stdout }}"
+
+- name: Run test suite via bash runner
+  ansible.builtin.command: >-
+    ./roles/role_cicd_tests/files/run-tests.sh
+    --target {{ effective_test_target }}
+    --junitxml /tmp/test-results-{{ effective_test_target }}.xml
+  environment:
+    KUBE_POD: "{{ effective_kube_pod }}"
+    KUBE_NS: "{{ effective_kube_ns }}"
+    TEST_TARGET: "{{ effective_test_target }}"
+  register: test_run
+  failed_when: test_run.rc != 0
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+
+- name: Show test runner output
+  ansible.builtin.debug:
+    var: test_run.stdout_lines
+
+- name: Parse JUnit XML and show summary
+  ansible.builtin.command: >-
+    python3 ./roles/role_cicd_tests/files/parse_junit.py /tmp/test-results-{{ effective_test_target }}.xml
+  register: junit_summary
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+
+- name: Print concise test summary
+  vars:
+    _j: "{{ junit_summary.stdout | default('{}') | from_json }}"
+  ansible.builtin.debug:
+    msg:
+      - "Tests: total={{ _j.total | default(0) }}"
+      - "passed={{ _j.passed | default(0) }} failures={{ _j.failures | default(0) }}"
+      - "errors={{ _j.errors | default(0) }} skipped={{ _j.skipped | default(0) }}"
+  when: junit_summary.stdout is defined

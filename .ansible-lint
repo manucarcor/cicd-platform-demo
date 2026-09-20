@@ -1,0 +1,12 @@
+---
+# Ansible-lint configuration file
+exclude_paths:
+  - .venv/
+  - .venv-cicd-tests/
+  - roles/role_cicd_tests/.venv-cicd-tests/
+  - '**/.venv*/'
+  - '**/__pycache__/'
+  - '**/site-packages/'
+
+skip_list:
+  - warning[outdated-tag]  # Skip warnings from vendored dependencies

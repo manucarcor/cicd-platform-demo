@@ -1,0 +1,205 @@
+# Gitlab Chart Values
+## Number of replicas
+replicaCount: {{ gitlab_replica_count | default(1) }}
+## Namespace
+namespace: {{ gitlab_namespace }}
+## Override the namespace
+namespaceOverride: "{{ gitlab_namespace_override | default('') }}"
+## fullnameOverride
+fullnameOverride: "{{ gitlab_fullname_override | default('') }}"
+## App name
+app:
+  name: {{ gitlab_app_name | default("gitlab") }}
+domain: {{ cluster_domain }}
+## Gitlab Image
+image:
+  repository: {{ gitlab_image_repository | default("gitlab/gitlab-ce") }}
+  tag: "{{ gitlab_image_tag | default('18.7.0-ce.0') }}"
+  pullPolicy: {{ gitlab_image_pull_policy | default("IfNotPresent") }}
+  secret:
+    registry: {{ gitlab_image_registry | default("docker.io") }}
+    enabled: {{ gitlab_image_secret_enabled | default(false) }}
+    existing: "{{ gitlab_image_secret_existing | default('') }}"
+
+## Persistence section
+persistence:
+  mounts:
+    gitlab-data:
+      enabled: {{ gitlab_persistence_data_enabled | default(true) }}
+      size: {{ gitlab_persistence_data_size | default("8Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ gitlab_persistence_data_access_mode | default("ReadWriteOnce") }}
+      annotations: {}
+      mountPath: "{{ gitlab_persistence_data_mount_path | default('/var/opt/gitlab') }}"
+      existingClaim: "{{ gitlab_persistence_data_existing_claim | default('') }}"
+    gitlab-logs:
+      enabled: {{ gitlab_persistence_logs_enabled | default(true) }}
+      size: {{ gitlab_persistence_logs_size | default("8Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ gitlab_persistence_logs_access_mode | default("ReadWriteOnce") }}
+      annotations: {}
+      mountPath: "{{ gitlab_persistence_logs_mount_path | default('/var/log/gitlab') }}"
+      existingClaim: "{{ gitlab_persistence_logs_existing_claim | default('') }}"
+    gitlab-config:
+      enabled: {{ gitlab_persistence_config_enabled | default(true) }}
+      size: {{ gitlab_persistence_config_size | default("1Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ gitlab_persistence_config_access_mode | default("ReadWriteOnce") }}
+      annotations: {}
+      mountPath: "{{ gitlab_persistence_config_mount_path | default('/etc/gitlab') }}"
+      existingClaim: "{{ gitlab_persistence_config_existing_claim | default('') }}"
+  persistentVolumeClaimRetentionPolicy:
+    enabled: {{ gitlab_pvc_retention_policy_enabled | default(true) }}
+    whenDeleted: "{{ gitlab_pvc_retention_when_deleted | default('Retain') }}"
+    whenScaled: "{{ gitlab_pvc_retention_when_scaled | default('Retain') }}"
+
+## Service configuration
+service:
+  type: {{ gitlab_service_type | default("ClusterIP") }}
+
+## Port configuration
+ports:
+  http: {{ gitlab_port_http | default(443) }}
+  ssh: {{ gitlab_port_ssh | default(22) }}
+
+http:
+  scheme: {{ gitlab_http_scheme | default("HTTPS") }}
+
+## Ingress
+ingress:
+  enabled: {{ gitlab_ingress_enabled | default(true) }}
+  service_domains:
+{% if gitlab_ingress_domains is defined %}
+{% for domain in gitlab_ingress_domains %}
+    - name: {{ domain }}
+{% endfor %}
+{% else %}
+    - name: gitlab.{{ cluster_domain }}
+{% endif %}
+  tls:
+    enabled: {{ gitlab_ingress_tls_enabled | default(true) }}
+    secretName: {{ gitlab_ingress_tls_secret | default("") }}
+  backend:
+    service:
+      port: {{ gitlab_ingress_backend_port | default(443) }}
+## Resources limits and requests
+resources:
+  limits:
+    cpu: "{{ gitlab_resources_limits_cpu | default('2000m') }}"
+    memory: "{{ gitlab_resources_limits_memory | default('8Gi') }}"
+  requests:
+    cpu: "{{ gitlab_resources_requests_cpu | default('2000m') }}"
+    memory: "{{ gitlab_resources_requests_memory | default('8Gi') }}"
+
+## Security context
+podSecurityContext:
+  runAsUser: {{ gitlab_run_as_user | default(0) }}
+
+## Liveness probe configuration
+livenessProbe:
+  enabled: {{ gitlab_liveness_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ gitlab_liveness_probe_path | default('/-/liveness') }}"
+    scheme: {{ gitlab_http_scheme | default("HTTPS") }}
+    port: {{ gitlab_port_http | default(443) }}
+  initialDelaySeconds: {{ gitlab_liveness_probe_initial_delay | default(120) }}
+  periodSeconds: {{ gitlab_liveness_probe_period | default(60) }}
+  timeoutSeconds: {{ gitlab_liveness_probe_timeout | default(10) }}
+  failureThreshold: {{ gitlab_liveness_probe_failure_threshold | default(15) }}
+  successThreshold: {{ gitlab_liveness_probe_success_threshold | default(1) }}
+
+## Readiness probe configuration
+readinessProbe:
+  enabled: {{ gitlab_readiness_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ gitlab_readiness_probe_path | default('/-/readiness') }}"
+    scheme: {{ gitlab_http_scheme | default("HTTPS") }}
+    port: {{ gitlab_port_http | default(443) }}
+  initialDelaySeconds: {{ gitlab_readiness_probe_initial_delay | default(120) }}
+  periodSeconds: {{ gitlab_readiness_probe_period | default(30) }}
+  timeoutSeconds: {{ gitlab_readiness_probe_timeout | default(5) }}
+  failureThreshold: {{ gitlab_readiness_probe_failure_threshold | default(15) }}
+  successThreshold: {{ gitlab_readiness_probe_success_threshold | default(1) }}
+
+## Startup probe configuration
+startupProbe:
+  enabled: {{ gitlab_startup_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ gitlab_startup_probe_path | default('/-/readiness') }}"
+    scheme: {{ gitlab_http_scheme | default("HTTPS") }}
+    port: {{ gitlab_port_http | default(443) }}
+  initialDelaySeconds: {{ gitlab_startup_probe_initial_delay | default(60) }}
+  periodSeconds: {{ gitlab_startup_probe_period | default(30) }}
+  timeoutSeconds: {{ gitlab_startup_probe_timeout | default(5) }}
+  failureThreshold: {{ gitlab_startup_probe_failure_threshold | default(15) }}
+  successThreshold: {{ gitlab_startup_probe_success_threshold | default(1) }}
+
+## Update strategy
+updateStrategy:
+  type: {{ gitlab_update_strategy | default("RollingUpdate") }}
+command: []
+
+conf:
+  # Env vars
+  env:
+    TZ: "{{ gitlab_timezone | default('Europe/Madrid') }}"
+    GITLAB_EXTERNAL_SCHEME: "{{ gitlab_external_scheme | default('https') }}"
+    GITLAB_EXTERNAL_HOSTNAME: "{{ gitlab_external_hostname | default('gitlab.' + cluster_domain) }}"
+    ZABBIX_JVM_MONITORING_DEBUG_LEVEL: "{{ gitlab_zabbix_debug_level | default('info') }}"
+    ZABBIX_JVM_MONITORING_SERVER: "{{ gitlab_zabbix_server | default('zabbix-server.' + cluster_domain) }}"
+    ZABBIX_JVM_MONITORING_SERVER_ACTIVE: "{{ gitlab_zabbix_server_active | default('zabbix-server.' + cluster_domain) }}"
+    ZABBIX_JVM_MONITORING_HOST_NAME: "{{ gitlab_zabbix_hostname | default('gitlab.' + cluster_domain) }}"
+    ZABBIX_JVM_MONITORING_HOST_METADATA: "{{ gitlab_zabbix_metadata | default('gitlab') }}"
+    ZABBIX_JVM_MONITORING_REFRESH_ACTIVE_CHECKS: {{ gitlab_zabbix_refresh | default(120) }}
+  tls:
+    enabled: {{ gitlab_tls_enabled | default(true) }}
+    secret_name: "{{ gitlab_tls_secret_name | default('tls-certificates-gitlab') }}"
+    cert_file: |
+{{ gitlab_tls_cert_file | default('') | indent(6, false) }}
+    key_file: |
+{{ gitlab_tls_key_file | default('') | indent(6, false) }}
+  gitlab:
+    root_password: "{{ gitlab_root_password }}"
+    services:
+      nginx:
+        enabled: {{ gitlab_nginx_enabled | default(true) }}
+      prometheus:
+        enabled: {{ gitlab_prometheus_enabled | default(false) }}
+      pages:
+        enabled: {{ gitlab_pages_enabled | default(false) }}
+      registry:
+        enabled: {{ gitlab_registry_enabled | default(false) }}
+      mailroom:
+        enabled: {{ gitlab_mailroom_enabled | default(false) }}
+    config: |
+{{ gitlab_config | default('') | indent(6, false) }}
+  zabbix:
+    enable: {{ gitlab_zabbix_enabled | default(false) }}
+    debugLevel: "{{ gitlab_zabbix_debug_level | default('info') }}"
+    server: "{{ gitlab_zabbix_server | default('zabbix-server.' + cluster_domain) }}"
+    serveractive: "{{ gitlab_zabbix_server_active | default('zabbix-server.' + cluster_domain) }}"
+    hostname: "{{ gitlab_zabbix_hostname | default('gitlab.' + cluster_domain) }}"
+    hostmetadata: "{{ gitlab_zabbix_metadata | default('gitlab') }}"
+    refreshactivechecks: {{ gitlab_zabbix_refresh | default(120) }}
+
+## Node labels for pod assignment
+nodeSelector: {{ gitlab_node_selector | default({}) }}
+
+## Tolerations for pod assignment
+tolerations: {{ gitlab_tolerations | default([]) }}
+
+## Nodename for pod assignment
+nodeName: "{{ gitlab_node_name | default('') }}"
+
+## Affinity for pod assignment
+affinity: {{ gitlab_affinity | default({}) }}
+
+## Pod management policy
+podManagementPolicy: "{{ gitlab_pod_management_policy | default('Parallel') }}"
+## Jenkins integration annotations
+jenkins:
+  pipeline: "{{ gitlab_pipeline | default('') }}"
+  buildNumber: "{{ gitlab_build_number | default('') }}"

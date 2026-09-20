@@ -1,0 +1,216 @@
+# Jenkins Chart Values
+## Number of replicas
+replicaCount: {{ jenkins_replica_count | default(1) }}
+## Namespace
+namespace: {{ jenkins_namespace }}
+## Override the namespace
+namespaceOverride: "{{ jenkins_namespace_override | default('') }}"
+## fullnameOverride
+fullnameOverride: "{{ jenkins_fullname_override | default('') }}"
+## App name
+app:
+  name: {{ jenkins_app_name | default("jenkins") }}
+domain: {{ cluster_domain }}
+
+## Jenkins Image
+image:
+  repository: {{ jenkins_image_repository | default("jenkins/jenkins") }}
+  tag: "{{ jenkins_image_tag | default('2.546-jdk25') }}"
+  pullPolicy: {{ jenkins_image_pull_policy | default("IfNotPresent") }}
+  secret:
+    registry: {{ jenkins_image_registry | default("docker.io") }}
+    enabled: {{ jenkins_image_secret_enabled | default(false) }}
+    existing: "{{ jenkins_image_secret_existing | default('') }}"
+
+## Persistence section
+persistence:
+  mounts:
+    jenkins-home:
+      enabled: {{ jenkins_persistence_home_enabled | default(true) }}
+      size: {{ jenkins_persistence_home_size | default("20Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ jenkins_persistence_home_access_mode | default("ReadWriteOnce") }}
+      annotations: {}
+      mountPath: "{{ jenkins_persistence_home_mount_path | default('/var/jenkins_home') }}"
+      existingClaim: "{{ jenkins_persistence_home_existing_claim | default('') }}"
+    jenkins-workspace:
+      enabled: {{ jenkins_persistence_workspace_enabled | default(true) }}
+      size: {{ jenkins_persistence_workspace_size | default("50Gi") }}
+      storageClass: "{{ storage_class | default('nfs-storage') }}"
+      accessModes:
+        - {{ jenkins_persistence_workspace_access_mode | default("ReadWriteOnce") }}
+      annotations: {}
+      mountPath: "{{ jenkins_persistence_workspace_mount_path | default('/var/jenkins_home/workspace') }}"
+      existingClaim: "{{ jenkins_persistence_workspace_existing_claim | default('') }}"
+  persistentVolumeClaimRetentionPolicy:
+    enabled: {{ jenkins_pvc_retention_policy_enabled | default(true) }}
+    whenDeleted: "{{ jenkins_pvc_retention_when_deleted | default('Retain') }}"
+    whenScaled: "{{ jenkins_pvc_retention_when_scaled | default('Retain') }}"
+
+## Service configuration
+service:
+  type: {{ jenkins_service_type | default("ClusterIP") }}
+
+## Port configuration
+ports:
+  http: {{ jenkins_port_http | default(8080) }}
+  https: {{ jenkins_port_https | default(8443) }}
+  agent: {{ jenkins_port_agent | default(50000) }}
+
+http:
+  scheme: {{ jenkins_http_scheme | default("HTTPS") }}
+
+## Ingress
+ingress:
+  enabled: {{ jenkins_ingress_enabled | default(true) }}
+  service_domains:
+{% if jenkins_ingress_domains is defined %}
+{% for domain in jenkins_ingress_domains %}
+    - name: {{ domain }}
+{% endfor %}
+{% else %}
+    - name: jenkins.{{ cluster_domain }}
+{% endif %}
+  tls:
+    enabled: {{ jenkins_ingress_tls_enabled | default(true) }}
+    secretName: {{ jenkins_ingress_tls_secret | default("") }}
+  backend:
+    service:
+      port: {{ jenkins_ingress_backend_port | default(8443) }}
+
+## Resources limits and requests
+resources:
+  limits:
+    cpu: "{{ jenkins_resources_limits_cpu | default('2000m') }}"
+    memory: "{{ jenkins_resources_limits_memory | default('4Gi') }}"
+  requests:
+    cpu: "{{ jenkins_resources_requests_cpu | default('1000m') }}"
+    memory: "{{ jenkins_resources_requests_memory | default('2Gi') }}"
+
+## Security context
+podSecurityContext:
+  runAsUser: {{ jenkins_run_as_user | default(1000) }}
+  runAsGroup: {{ jenkins_run_as_group | default(1000) }}
+  fsGroup: {{ jenkins_fs_group | default(1000) }}
+
+## Liveness probe configuration
+livenessProbe:
+  enabled: {{ jenkins_liveness_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ jenkins_liveness_probe_path | default('/login') }}"
+    scheme: {{ jenkins_http_scheme | default("HTTPS") }}
+    port: {{ jenkins_port_https | default(8443) }}
+  initialDelaySeconds: {{ jenkins_liveness_probe_initial_delay | default(90) }}
+  periodSeconds: {{ jenkins_liveness_probe_period | default(30) }}
+  timeoutSeconds: {{ jenkins_liveness_probe_timeout | default(5) }}
+  failureThreshold: {{ jenkins_liveness_probe_failure_threshold | default(5) }}
+  successThreshold: {{ jenkins_liveness_probe_success_threshold | default(1) }}
+
+## Readiness probe configuration
+readinessProbe:
+  enabled: {{ jenkins_readiness_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ jenkins_readiness_probe_path | default('/login') }}"
+    scheme: {{ jenkins_http_scheme | default("HTTPS") }}
+    port: {{ jenkins_port_https | default(8443) }}
+  initialDelaySeconds: {{ jenkins_readiness_probe_initial_delay | default(60) }}
+  periodSeconds: {{ jenkins_readiness_probe_period | default(10) }}
+  timeoutSeconds: {{ jenkins_readiness_probe_timeout | default(5) }}
+  failureThreshold: {{ jenkins_readiness_probe_failure_threshold | default(3) }}
+  successThreshold: {{ jenkins_readiness_probe_success_threshold | default(1) }}
+
+## Startup probe configuration
+startupProbe:
+  enabled: {{ jenkins_startup_probe_enabled | default(true) }}
+  httpGet:
+    path: "{{ jenkins_startup_probe_path | default('/login') }}"
+    scheme: {{ jenkins_http_scheme | default("HTTPS") }}
+    port: {{ jenkins_port_https | default(8443) }}
+  initialDelaySeconds: {{ jenkins_startup_probe_initial_delay | default(30) }}
+  periodSeconds: {{ jenkins_startup_probe_period | default(10) }}
+  timeoutSeconds: {{ jenkins_startup_probe_timeout | default(5) }}
+  failureThreshold: {{ jenkins_startup_probe_failure_threshold | default(12) }}
+  successThreshold: {{ jenkins_startup_probe_success_threshold | default(1) }}
+
+## Update strategy
+updateStrategy:
+  type: {{ jenkins_update_strategy | default("RollingUpdate") }}
+
+command: []
+
+conf:
+  # Env vars
+  env:
+    TZ: "{{ jenkins_timezone | default('Europe/Madrid') }}"
+    JENKINS_EXTERNAL_SCHEME: "{{ jenkins_external_scheme | default('https') }}"
+    JENKINS_EXTERNAL_HOSTNAME: "{{ jenkins_external_hostname | default('jenkins.' + cluster_domain) }}"
+    JAVA_OPTS: "{{ jenkins_java_opts | default('-Xmx2G -Dhudson.model.DirectoryBrowserSupport.CSP=') }}"
+    JENKINS_SLAVE_AGENT_PORT: "{{ jenkins_port_agent | default(50000) }}"
+  tls:
+    enabled: {{ jenkins_tls_enabled | default(true) }}
+    secret_name: "{{ jenkins_tls_secret_name | default('tls-certificates-jenkins') }}"
+    keystorePassword: "{{ jenkins_tls_keystore_password | default('changeit') }}"
+    cert_file: |
+{{ jenkins_tls_cert_file | default('') | indent(6, false) }}
+    key_file: |
+{{ jenkins_tls_key_file | default('') | indent(6, false) }}
+  jenkins:
+    admin_username: {{ jenkins_admin_username | default("admin") }}
+    admin_password: "{{ jenkins_admin_password }}"
+    config: |
+{{ jenkins_config | default('') | indent(6, false) }}
+  zabbix:
+    enable: {{ jenkins_zabbix_enabled | default(false) }}
+    debugLevel: "{{ jenkins_zabbix_debug_level | default('info') }}"
+    server: "{{ jenkins_zabbix_server | default('zabbix-server.' + cluster_domain) }}"
+    serveractive: "{{ jenkins_zabbix_server_active | default('zabbix-server.' + cluster_domain) }}"
+    hostname: "{{ jenkins_zabbix_hostname | default('jenkins.' + cluster_domain) }}"
+    hostmetadata: "{{ jenkins_zabbix_metadata | default('jenkins') }}"
+    refreshactivechecks: {{ jenkins_zabbix_refresh | default(120) }}
+
+## RBAC Configuration
+rbac:
+  create: {{ jenkins_rbac_create | default(true) }}
+  readSecrets: {{ jenkins_rbac_read_secrets | default(false) }}
+
+## ServiceAccount Configuration
+serviceAccount:
+  create: {{ jenkins_service_account_create | default(true) }}
+  automount: {{ jenkins_service_account_automount | default(true) }}
+  annotations: {{ jenkins_service_account_annotations | default({}) }}
+  name: "{{ jenkins_service_account_name | default('') }}"
+
+## Node labels for pod assignment
+nodeSelector: {{ jenkins_node_selector | default({}) }}
+
+## Tolerations for pod assignment
+tolerations: {{ jenkins_tolerations | default([]) }}
+
+## Nodename for pod assignment
+nodeName: "{{ jenkins_node_name | default('') }}"
+
+## Affinity for pod assignment
+affinity: {{ jenkins_affinity | default({}) }}
+
+## Pod management policy
+podManagementPolicy: "{{ jenkins_pod_management_policy | default('Parallel') }}"
+
+## Jenkins integration annotations
+jenkins:
+  pipeline: "{{ jenkins_pipeline | default('') }}"
+  buildNumber: "{{ jenkins_build_number | default('') }}"
+
+## Plugins installation
+plugins:
+  enabled: {{ jenkins_plugins_enabled | default(true) }}
+  list:
+{% if jenkins_plugins_list is defined %}
+{% for plugin in jenkins_plugins_list %}
+    - {{ plugin }}
+{% endfor %}
+{% else %}
+    - git:latest
+    - workflow-aggregator:latest
+    - configuration-as-code:latest
+{% endif %}

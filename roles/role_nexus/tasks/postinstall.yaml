@@ -1,0 +1,76 @@
+# Nexus post-install configuration for Kubernetes/Rancher
+---
+- name: "Nexus post installation: Check if Nexus is active"
+  ansible.builtin.uri:
+    url: "https://{{ nexus_hostname }}/service/rest/v1/status"
+    method: GET
+    validate_certs: false
+    status_code: 200
+    headers:
+      Accept: "application/json"
+  register: nexus_status_check
+  until: nexus_status_check.status == 200
+  retries: 20
+  delay: 10
+  delegate_to: localhost
+
+- name: "Nexus post installation: Get Nexus pod name"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ nexus_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name={{ nexus_app_name }}"
+    field_selectors:
+      - status.phase=Running
+  register: nexus_pods
+
+- name: "Nexus post installation: Get initial admin password (first install only)"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ nexus_namespace }}"
+    pod: "{{ nexus_pods.resources[0].metadata.name }}"
+    command: cat /nexus-data/admin.password
+  register: nexus_initial_password
+  failed_when: false
+  changed_when: false
+  when: nexus_pods.resources | length > 0
+
+- name: "Nexus post installation: Change default admin password (only on first install)"
+  ansible.builtin.uri:
+    url: "https://{{ nexus_hostname }}/service/rest/v1/security/users/admin/change-password"
+    method: PUT
+    status_code: [204]
+    validate_certs: false
+    headers:
+      Content-Type: "text/plain"
+    body: "{{ secret_nexus_admin_password }}"
+    force_basic_auth: true
+    user: admin
+    password: "{{ nexus_initial_password.stdout | trim }}"
+  register: change_nexus_admin_password
+  when:
+    - nexus_pods.resources | length > 0
+    - nexus_initial_password.rc == 0
+    - nexus_initial_password.stdout | trim != ""
+    - nexus_initial_password.stdout | trim != secret_nexus_admin_password
+  delegate_to: localhost
+
+- name: "Nexus post installation: Disable anonymous access"
+  ansible.builtin.uri:
+    url: "https://{{ nexus_hostname }}/service/rest/v1/security/anonymous"
+    method: PUT
+    validate_certs: false
+    status_code: [200, 204]
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      enabled: false
+      userId: "anonymous"
+      realmName: "NexusAuthorizingRealm"
+    force_basic_auth: true
+    user: admin
+    password: "{{ secret_nexus_admin_password }}"
+  register: disable_anonymous_response
+  delegate_to: localhost

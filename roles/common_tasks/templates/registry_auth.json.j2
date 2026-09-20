@@ -1,0 +1,9 @@
+{
+    "auths": {
+        "{{ registry | string }}": {
+            "username": "{{ registry_username | string }}",
+            "password": "{{ registry_password | string }}",
+            "auth": "{{ (registry_username + ':' + registry_password) | b64encode | string }}"
+        }
+    }
+}

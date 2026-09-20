@@ -1,0 +1,37 @@
+---
+- name: Install requirements
+  hosts: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Install required Ansible collections
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection install kubernetes.core --force
+      changed_when: false
+
+    - name: Download helm installer
+      ansible.builtin.get_url:
+        url: "{{ helm_url_installer }}"
+        dest: /usr/local/sbin/helm
+        mode: '0774'
+        force: true
+      become: true
+
+    - name: Set Helm permissions
+      ansible.builtin.file:
+        path: /usr/local/sbin/helm
+        mode: '0755'
+      become: true
+
+    - name: Add Helm repositories
+      kubernetes.core.helm_repository:
+        name: "{{ item.name }}"
+        repo_url: "{{ item.url }}"
+        username: "{{ common_tasks_helm_username }}"
+        password: "{{ common_tasks_helm_password }}"
+      with_items:
+        - { name: "traefik", url: "https://helm.traefik.io/traefik" }
+        - { name: "gitlab", url: "https://charts.gitlab.io" }
+        - { name: "sonatype", url: "https://sonatype.github.io/helm3-charts" }
+        - { name: "internal", url: "{{ registry_snapshots }}" }
+      when: item.url != ""

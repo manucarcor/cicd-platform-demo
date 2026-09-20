@@ -1,0 +1,19 @@
+---
+# Common task for cleaning up previous Helm installations
+# Variables required:
+#   - helm_release_name: Name of the Helm release to uninstall
+#   - target_namespace: Namespace where the release is installed
+#   - cleanup_timeout: (optional) Timeout for cleanup operation (default: 300s)
+
+- name: Check if helm release exists
+  ansible.builtin.command:
+    cmd: "helm status {{ helm_release_name }} -n {{ target_namespace }}"
+  register: helm_check
+  failed_when: false
+  changed_when: false
+
+- name: "Cleanup previous installation"
+  ansible.builtin.command:
+    cmd: "helm uninstall {{ helm_release_name }} -n {{ target_namespace }} --wait --timeout {{ cleanup_timeout | default('5m0s') }}"
+  when: helm_check.rc == 0
+  changed_when: true

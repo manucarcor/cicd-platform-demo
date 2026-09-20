@@ -1,0 +1,11 @@
+---
+- name: Deploy CI/CD Tools
+  hosts: rke2_manager
+  gather_facts: false
+  become: false
+  roles:
+    - { role: role_traefik, tags: ['traefik'] }
+    - { role: role_jenkins, tags: ['jenkins'] }
+    - { role: role_gitlab, tags: ['gitlab'] }
+    - { role: role_gitlab_runner, tags: ['gitlab-runner'] }
+    - { role: role_nexus, tags: ['nexus'] }

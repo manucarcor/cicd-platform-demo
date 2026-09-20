@@ -1,0 +1,451 @@
+---
+# Global Configuration
+cluster_domain: cicd.example.test
+helm_url_installer: "https://mirror.openshift.com/pub/openshift-v4/clients/helm/latest/helm-linux-amd64"
+storage_class: "nfs-storage"
+
+# Registry Configuration
+registry_username: "helm-reader"
+registry_password: "{{ secret_registry_password }}"
+registry: docker-registry.example.org
+image_pull_secret: docker-registry-secret
+registry_snapshots: "https://nexus.example.org/repository/helm-snapshots"
+registry_releases: "https://nexus.example.org/repository/helm-releases/"
+
+# Common Tasks Configuration
+common_tasks_values_path: "/tmp"
+common_tasks_helm_username: "{{ secret_helm_username }}"
+common_tasks_helm_password: "{{ secret_helm_password }}"
+
+# Ingress Controller Selection
+ingress_controller: "nginx"  # Puede ser "traefik" o "nginx"
+
+# Traefik Configuration
+traefik_app_name: "traefik"
+traefik_namespace: "traefik"
+traefik_chart_ref: "traefik-chart"
+traefik_chart_version: "0.0.1-SNAPSHOT"
+traefik_helm_chart_repository: "{{ registry_snapshots }}"
+
+# Traefik Image
+traefik_image_registry: "docker.io"
+traefik_image_repository: "traefik"
+traefik_image_tag: "3.1.4"
+traefik_image_pull_policy: "IfNotPresent"
+traefik_image_secret_enabled: false
+
+# Traefik Service
+traefik_service_type: "LoadBalancer"
+traefik_load_balancer_ip: ""
+traefik_external_traffic_policy: "Cluster"
+traefik_port_web: 80
+traefik_port_websecure: 443
+traefik_port_traefik: 8080
+
+# Traefik Ingress (for dashboard)
+traefik_ingress_enabled: false
+traefik_ingress_tls_enabled: false
+traefik_ingress_tls_secret: ""
+traefik_ingress_backend_port: 8080
+
+# Traefik Persistence
+traefik_persistence_enabled: true
+traefik_persistence_size: "1Gi"
+traefik_persistence_access_mode: "ReadWriteOnce"
+traefik_persistence_mount_path: "/data"
+traefik_pvc_retention_policy_enabled: true
+
+# Traefik Security Context
+traefik_run_as_user: 65532
+traefik_run_as_group: 65532
+traefik_fs_group: 65532
+traefik_run_as_non_root: true
+traefik_allow_privilege_escalation: false
+traefik_read_only_root_filesystem: true
+
+# Traefik Resources
+traefik_replica_count: 1
+traefik_resources_limits_cpu: "1000m"
+traefik_resources_limits_memory: "1Gi"
+traefik_resources_requests_cpu: "500m"
+traefik_resources_requests_memory: "512Mi"
+
+# Traefik Probes
+traefik_liveness_probe_enabled: true
+traefik_liveness_probe_initial_delay: 10
+traefik_liveness_probe_period: 10
+traefik_liveness_probe_timeout: 5
+traefik_liveness_probe_failure_threshold: 3
+traefik_readiness_probe_enabled: true
+traefik_readiness_probe_initial_delay: 10
+traefik_readiness_probe_period: 10
+traefik_readiness_probe_timeout: 5
+traefik_readiness_probe_failure_threshold: 3
+
+# Traefik Configuration
+traefik_dashboard_enabled: true
+traefik_dashboard_insecure: true
+traefik_ping_enabled: true
+traefik_log_level: "INFO"
+traefik_access_log_enabled: true
+traefik_k8s_ingress_enabled: true
+traefik_k8s_crd_enabled: false
+
+# Traefik RBAC
+traefik_rbac_create: true
+traefik_service_account_create: true
+traefik_service_account_automount: true
+
+# Jenkins Configuration
+jenkins_app_name: "jenkins-chart"
+jenkins_namespace: "jenkins"
+jenkins_chart_ref: "jenkins-chart"
+jenkins_chart_version: "0.0.1-SNAPSHOT"
+jenkins_helm_chart_repository: "{{ registry_snapshots }}"
+
+# Jenkins Image
+jenkins_image_registry: "docker.io"
+jenkins_image_repository: "jenkins/jenkins"
+jenkins_image_tag: "2.546-jdk25"
+jenkins_image_pull_policy: "IfNotPresent"
+jenkins_image_secret_enabled: false
+
+# Jenkins Admin
+jenkins_admin_username: "admin"
+jenkins_admin_password: "{{ secret_jenkins_admin_password }}"
+
+# Jenkins Service
+jenkins_service_type: "ClusterIP"
+jenkins_port_http: 8080
+jenkins_port_https: 8443
+jenkins_port_agent: 50000
+jenkins_http_scheme: "HTTPS"
+
+# Jenkins Ingress
+jenkins_ingress_enabled: true
+jenkins_ingress_tls_enabled: true
+jenkins_ingress_tls_secret: "tls-certificates-jenkins"
+jenkins_ingress_backend_port: 8443
+
+# Jenkins TLS (internal HTTPS)
+jenkins_tls_enabled: true
+jenkins_tls_secret_name: "tls-certificates-jenkins"
+
+# Jenkins Persistence - Home
+jenkins_persistence_home_enabled: true
+jenkins_persistence_home_size: "20Gi"
+jenkins_persistence_home_access_mode: "ReadWriteOnce"
+jenkins_persistence_home_mount_path: "/var/jenkins_home"
+jenkins_pvc_retention_policy_enabled: true
+
+# Jenkins Persistence - Workspace
+jenkins_persistence_workspace_enabled: true
+jenkins_persistence_workspace_size: "50Gi"
+jenkins_persistence_workspace_access_mode: "ReadWriteOnce"
+jenkins_persistence_workspace_mount_path: "/var/jenkins_home/workspace"
+
+# Jenkins Security Context
+jenkins_run_as_user: 1000
+jenkins_run_as_group: 1000
+jenkins_fs_group: 1000
+
+# Jenkins Resources
+jenkins_replica_count: 1
+jenkins_resources_limits_cpu: "2000m"
+jenkins_resources_limits_memory: "4Gi"
+jenkins_resources_requests_cpu: "1000m"
+jenkins_resources_requests_memory: "2Gi"
+
+# Jenkins Environment
+jenkins_timezone: "Europe/Madrid"
+jenkins_java_opts: "-Xmx2G -Dhudson.model.DirectoryBrowserSupport.CSP="
+
+# Jenkins Probes
+jenkins_startup_probe_enabled: true
+jenkins_startup_probe_initial_delay: 30
+jenkins_startup_probe_period: 10
+jenkins_startup_probe_timeout: 5
+jenkins_startup_probe_failure_threshold: 12
+jenkins_liveness_probe_enabled: true
+jenkins_liveness_probe_initial_delay: 90
+jenkins_liveness_probe_period: 30
+jenkins_liveness_probe_timeout: 5
+jenkins_liveness_probe_failure_threshold: 5
+jenkins_readiness_probe_enabled: true
+jenkins_readiness_probe_initial_delay: 60
+jenkins_readiness_probe_period: 10
+jenkins_readiness_probe_timeout: 5
+jenkins_readiness_probe_failure_threshold: 3
+
+# Jenkins RBAC
+jenkins_rbac_create: true
+jenkins_rbac_read_secrets: false
+jenkins_service_account_create: true
+jenkins_service_account_automount: true
+
+# Jenkins Plugins
+jenkins_plugins_enabled: false
+
+# Jenkins Monitoring
+jenkins_zabbix_enabled: false
+
+# GitLab Configuration
+gitlab_app_name: "gitlab"
+gitlab_namespace: "gitlab"
+gitlab_chart_ref: "gitlab-chart"
+gitlab_chart_version: "0.0.1-SNAPSHOT"
+gitlab_helm_chart_repository: "{{ registry_snapshots }}"
+
+# GitLab Image
+gitlab_image_registry: "docker.io"
+gitlab_image_repository: "gitlab/gitlab-ce"
+gitlab_image_tag: "18.7.0-ce.0"
+gitlab_image_pull_policy: "IfNotPresent"
+gitlab_image_secret_enabled: false
+
+# GitLab Admin
+gitlab_root_password: "{{ secret_gitlab_root_password }}"
+
+# GitLab Service
+gitlab_service_type: "ClusterIP"
+gitlab_port_http: 443
+gitlab_port_ssh: 22
+gitlab_http_scheme: "HTTPS"
+
+# GitLab Ingress
+gitlab_ingress_enabled: true
+gitlab_ingress_tls_enabled: true
+gitlab_ingress_tls_secret: "tls-certificates-gitlab"
+gitlab_ingress_backend_port: 443
+
+# GitLab TLS (internal HTTPS)
+gitlab_tls_enabled: true
+gitlab_tls_secret_name: "tls-certificates-gitlab"
+
+# GitLab Persistence - Data
+gitlab_persistence_data_enabled: true
+gitlab_persistence_data_size: "20Gi"
+gitlab_pvc_retention_policy_enabled: true
+
+# GitLab Persistence - Logs
+gitlab_persistence_logs_enabled: true
+gitlab_persistence_logs_size: "8Gi"
+
+# GitLab Persistence - Config
+gitlab_persistence_config_enabled: true
+gitlab_persistence_config_size: "1Gi"
+
+# GitLab Security Context
+gitlab_run_as_user: 0
+
+# GitLab Resources
+gitlab_replica_count: 1
+gitlab_resources_limits_cpu: "2000m"
+gitlab_resources_limits_memory: "8Gi"
+gitlab_resources_requests_cpu: "2000m"
+gitlab_resources_requests_memory: "8Gi"
+
+# GitLab Probes
+gitlab_liveness_probe_enabled: true
+gitlab_liveness_probe_initial_delay: 120
+gitlab_liveness_probe_period: 60
+gitlab_liveness_probe_timeout: 10
+gitlab_liveness_probe_failure_threshold: 15
+gitlab_readiness_probe_enabled: true
+gitlab_readiness_probe_initial_delay: 120
+gitlab_readiness_probe_period: 30
+gitlab_readiness_probe_timeout: 5
+gitlab_readiness_probe_failure_threshold: 15
+gitlab_startup_probe_enabled: true
+gitlab_startup_probe_initial_delay: 60
+gitlab_startup_probe_period: 30
+gitlab_startup_probe_timeout: 5
+gitlab_startup_probe_failure_threshold: 15
+
+# GitLab Services
+gitlab_nginx_enabled: true
+gitlab_prometheus_enabled: false
+gitlab_pages_enabled: false
+gitlab_registry_enabled: false
+gitlab_mailroom_enabled: false
+
+# GitLab Monitoring
+gitlab_zabbix_enabled: false
+
+# Nexus Configuration
+nexus_app_name: "nexus-chart"
+nexus_namespace: "nexus"
+nexus_chart_ref: "nexus-chart"
+nexus_chart_version: "0.0.2-SNAPSHOT"
+nexus_helm_chart_repository: "{{ registry_snapshots }}"
+
+# Nexus Image
+nexus_image_registry: "docker.io"
+nexus_image_repository: "sonatype/nexus3"
+nexus_image_tag: "3.85.0"
+nexus_image_pull_policy: "IfNotPresent"
+nexus_image_secret_enabled: false
+
+# Nexus Admin
+nexus_admin_username: "admin"
+nexus_admin_password: "{{ secret_nexus_admin_password }}"
+
+# Nexus Service
+nexus_service_type: "ClusterIP"
+nexus_port_http: 8081
+nexus_port_https: 8443
+nexus_port_docker: 5000
+nexus_http_scheme: "HTTP"
+
+# Nexus Ingress
+nexus_ingress_enabled: true
+nexus_ingress_controller: "nginx"
+nexus_ingress_path_type: "Prefix"
+nexus_ingress_path: "/"
+nexus_ingress_tls_enabled: true
+nexus_ingress_tls_secret: "tls-certificates-nexus"
+nexus_ingress_backend_port: 8443
+
+# Nexus TLS (internal HTTPS)
+nexus_tls_enabled: false
+nexus_tls_secret_name: "tls-certificates-nexus"
+
+# Nexus Persistence
+nexus_persistence_enabled: true
+nexus_persistence_size: "8Gi"
+nexus_persistence_access_mode: "ReadWriteOnce"
+nexus_persistence_mount_path: "/nexus-data"
+nexus_pvc_retention_policy_enabled: true
+
+# Nexus Security Context
+nexus_run_as_user: 200
+nexus_run_as_group: 200
+nexus_fs_group: 200
+
+# Nexus Resources
+nexus_replica_count: 1
+nexus_resources_limits_cpu: "2"
+nexus_resources_limits_memory: "4Gi"
+nexus_resources_requests_cpu: "1"
+nexus_resources_requests_memory: "2Gi"
+
+# Nexus Probes
+nexus_startup_probe_enabled: true
+nexus_startup_probe_initial_delay: 30
+nexus_startup_probe_period: 10
+nexus_startup_probe_timeout: 5
+nexus_startup_probe_failure_threshold: 30
+nexus_liveness_probe_enabled: true
+nexus_liveness_probe_initial_delay: 120
+nexus_liveness_probe_period: 30
+nexus_liveness_probe_timeout: 5
+nexus_liveness_probe_failure_threshold: 5
+nexus_readiness_probe_enabled: true
+nexus_readiness_probe_initial_delay: 60
+nexus_readiness_probe_period: 10
+nexus_readiness_probe_timeout: 5
+nexus_readiness_probe_failure_threshold: 3
+
+# Nexus Monitoring
+nexus_zabbix_enabled: false
+
+# GitLab Runner Configuration
+gitlab_runner_app_name: "gitlab-runner"
+gitlab_runner_namespace: "gitlab-runner"
+gitlab_runner_chart_ref: "gitlab-runner-chart"
+gitlab_runner_chart_version: "0.0.1-SNAPSHOT"
+gitlab_runner_helm_chart_repository: "{{ registry_snapshots }}"
+
+# GitLab Runner Connection
+gitlab_runner_gitlab_url: "https://gitlab.{{ cluster_domain }}/"
+gitlab_runner_gitlab_dns: "gitlab.{{ cluster_domain }}"
+gitlab_runner_gitlab_ip: ""
+gitlab_runner_token: "{{ secret_gitlab_runner_token }}"
+
+# GitLab Runner TLS
+gitlab_runner_tls_enabled: false
+gitlab_runner_tls_ca: ""
+gitlab_runner_tls_cacert: ""
+
+# GitLab Runner Settings
+gitlab_runner_name: "kubernetes-runner"
+gitlab_runner_tags: "kubernetes,docker"
+gitlab_runner_run_untagged: true
+gitlab_runner_protected: false
+gitlab_runner_executor: "kubernetes"
+gitlab_runner_request_concurrency: 10
+gitlab_runner_secret_name: "gitlab-runner-secret"
+
+# GitLab Runner Image
+gitlab_runner_image_registry: "registry.gitlab.com"
+gitlab_runner_image_repository: "gitlab-org/gitlab-runner"
+gitlab_runner_image_tag: "latest"
+gitlab_runner_image_pull_policy: "IfNotPresent"
+gitlab_runner_image_secret_enabled: false
+
+# GitLab Runner RBAC
+gitlab_runner_rbac_create: true
+gitlab_runner_cluster_wide_access: false
+gitlab_runner_service_account_create: true
+gitlab_runner_service_account_name: ""
+
+# GitLab Runner Resources
+gitlab_runner_replica_count: 1
+gitlab_runner_resources_limits_memory: "256Mi"
+gitlab_runner_resources_limits_cpu: "200m"
+gitlab_runner_resources_requests_memory: "128Mi"
+gitlab_runner_resources_requests_cpu: "100m"
+
+# GitLab Runner Job Resources
+gitlab_runner_job_cpu_limit: "1000m"
+gitlab_runner_job_memory_limit: "1Gi"
+gitlab_runner_job_cpu_request: "100m"
+gitlab_runner_job_memory_request: "128Mi"
+
+# GitLab Runner Service Resources
+gitlab_runner_service_cpu_limit: "200m"
+gitlab_runner_service_memory_limit: "256Mi"
+gitlab_runner_service_cpu_request: "100m"
+gitlab_runner_service_memory_request: "128Mi"
+
+# GitLab Runner Helper Resources
+gitlab_runner_helper_cpu_limit: "200m"
+gitlab_runner_helper_memory_limit: "256Mi"
+gitlab_runner_helper_cpu_request: "100m"
+gitlab_runner_helper_memory_request: "128Mi"
+
+# GitLab Runner Security Context
+gitlab_runner_run_as_user: 999
+gitlab_runner_run_as_group: 999
+gitlab_runner_run_as_non_root: true
+gitlab_runner_fs_group: 999
+gitlab_runner_allow_privilege_escalation: false
+gitlab_runner_read_only_root_filesystem: false
+
+# GitLab Runner Probes
+gitlab_runner_liveness_probe_initial_delay: 40
+gitlab_runner_liveness_probe_period: 10
+gitlab_runner_liveness_probe_timeout: 10
+gitlab_runner_liveness_probe_failure_threshold: 3
+gitlab_runner_readiness_probe_initial_delay: 50
+gitlab_runner_readiness_probe_period: 30
+gitlab_runner_readiness_probe_timeout: 5
+gitlab_runner_readiness_probe_failure_threshold: 15
+
+# GitLab Runner Logging
+gitlab_runner_log_level: "info"
+gitlab_runner_log_format: "runner"
+gitlab_runner_poll_timeout: 180
+
+# GitLab Runner Monitoring
+gitlab_runner_metrics_enabled: false
+gitlab_runner_metrics_port: 9252
+gitlab_runner_service_monitor_enabled: false
+
+# GitLab Runner Pod Settings
+gitlab_runner_pod_annotations: {}
+gitlab_runner_pod_labels: {}
+gitlab_runner_env_vars: []
+gitlab_runner_node_selector: {}
+gitlab_runner_tolerations: []
+gitlab_runner_affinity: {}

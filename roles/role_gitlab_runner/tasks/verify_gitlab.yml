@@ -1,0 +1,87 @@
+---
+# Verify GitLab deployment and get registration token dynamically (simplified)
+- name: Find GitLab StatefulSet in namespace
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: "{{ gitlab_namespace }}"
+  register: gitlab_statefulsets_info
+
+- name: Detect GitLab StatefulSet name
+  ansible.builtin.set_fact:
+    detected_gitlab_statefulset: >-
+      {{ gitlab_statefulsets_info.resources
+         | selectattr('metadata.name', 'match', '.*gitlab.*')
+         | map(attribute='metadata.name')
+         | first
+         | default(gitlab_app_name) }}
+
+- name: Fail if no GitLab StatefulSet found
+  ansible.builtin.fail:
+    msg: |
+      ❌ No GitLab StatefulSet found in namespace '{{ gitlab_namespace }}'.
+      Available StatefulSets: {{ gitlab_statefulsets_info.resources | map(attribute='metadata.name') | list }}
+      Please deploy GitLab first: ansible-playbook -i inventories/service-cluster-lab/hosts.ini Step02-deploy.yml --tags gitlab
+  when: gitlab_statefulsets_info.resources | length == 0
+
+- name: Get GitLab registration token directly from rails console
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ detected_gitlab_statefulset }}-0"
+    command: >-
+      gitlab-rails runner -e production "
+      begin
+        token = Gitlab::CurrentSettings.runners_registration_token
+        if token.nil? || token.empty?
+          puts 'ERROR: Registration token is nil or empty'
+          exit 1
+        else
+          puts token
+        end
+      rescue => e
+        puts \"ERROR: #{e.message}\"
+        exit 1
+      end
+      "
+  register: gitlab_registration_token_result
+  changed_when: false
+
+- name: Validate registration token output
+  ansible.builtin.fail:
+    msg: |
+      Failed to get GitLab registration token.
+      Error: {{ gitlab_registration_token_result.stdout }}
+      Please check GitLab deployment status.
+  when:
+    - gitlab_registration_token_result.stdout is defined
+    - "'ERROR:' in gitlab_registration_token_result.stdout"
+
+- name: Set GitLab registration token fact
+  ansible.builtin.set_fact:
+    gitlab_runner_registration_token: "{{ gitlab_registration_token_result.stdout | trim }}"
+  when: gitlab_registration_token_result.stdout is defined
+
+- name: Validate registration token is not empty
+  ansible.builtin.fail:
+    msg: |
+      Failed to obtain valid GitLab registration token.
+      Token is empty or undefined.
+      Obtained: '{{ gitlab_runner_registration_token | default('undefined') }}'
+  when:
+    - gitlab_runner_registration_token is undefined or gitlab_runner_registration_token == ""
+
+- name: Try fallback token retrieval methods if primary failed
+  ansible.builtin.include_tasks: get_token_fallback.yml
+  when: gitlab_runner_registration_token is undefined or gitlab_runner_registration_token == ""
+
+- name: Final validation of registration token
+  ansible.builtin.fail:
+    msg: |
+      ❌ Could not obtain GitLab registration token using any method.
+      Please check:
+      1. GitLab is fully deployed and running
+      2. GitLab pod has proper permissions
+      3. GitLab database is accessible
+      Manual token retrieval: kubectl exec -n {{ gitlab_namespace }} {{ detected_gitlab_statefulset }}-0 -- \
+      gitlab-rails runner "puts Gitlab::CurrentSettings.runners_registration_token"
+  when: gitlab_runner_registration_token is undefined or gitlab_runner_registration_token == ""

@@ -1,0 +1,35 @@
+---
+- name: Cleanup previous installation
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_cleanup.yml"
+  vars:
+    helm_release_name: "{{ nexus_app_name }}"
+    target_namespace: "{{ nexus_namespace }}"
+
+- name: Create namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ nexus_namespace }}"
+    state: present
+
+# Copy TLS certificate secret if TLS is enabled
+- name: Copy TLS certificate
+  ansible.builtin.include_tasks: roles/common_tasks/tasks/create_tls_certificate.yml
+  vars:
+    tls_enabled: "{{ nexus_tls_enabled | default(false) }}"
+    target_namespace: "{{ nexus_namespace }}"
+    tls_secret_name: "{{ nexus_tls_secret_name | default('nexus-tls-cert') }}"
+  when: nexus_tls_enabled | default(false) | bool
+
+
+- name: Include tasks helm deploy
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_deploy.yml"
+  loop:
+    - name: "{{ nexus_app_name }}"
+      namespace: "{{ nexus_namespace }}"
+      chart_ref: "{{ nexus_chart_ref }}"
+      helm_chart_repository: "{{ nexus_helm_chart_repository }}"
+      chart_version: "{{ nexus_chart_version }}"
+
+- name: Include post-installation tasks
+  ansible.builtin.include_tasks: postinstall.yaml

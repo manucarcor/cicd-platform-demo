@@ -1,0 +1,122 @@
+# GitLab post-install configuration for Kubernetes/Rancher
+---
+- name: "GitLab post installation: Check if GitLab is active"
+  ansible.builtin.uri:
+    url: "https://{{ gitlab_hostname }}/projects"
+    method: GET
+    validate_certs: false
+    status_code: [200, 302]
+    headers:
+      Accept: "text/html"
+  register: gitlab_status_check
+  until: gitlab_status_check.status in [200, 302]
+  retries: 30
+  delay: 20
+  delegate_to: localhost
+
+- name: "GitLab post installation: Get GitLab pod name"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ gitlab_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name=gitlab-chart"
+    field_selectors:
+      - status.phase=Running
+  register: gitlab_pods
+
+- name: "GitLab post installation: Check if initial password file exists (first install)"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ gitlab_pods.resources[0].metadata.name }}"
+    command: test -f /etc/gitlab/initial_root_password
+  register: gitlab_initial_password_exists
+  failed_when: false
+  changed_when: false
+  when: gitlab_pods.resources | length > 0
+
+- name: "GitLab post installation: Get initial root password (first install only)"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ gitlab_pods.resources[0].metadata.name }}"
+    command: "grep -oP 'Password: \\K.*' /etc/gitlab/initial_root_password"
+  register: gitlab_initial_password
+  failed_when: false
+  changed_when: false
+  when:
+    - gitlab_pods.resources | length > 0
+    - gitlab_initial_password_exists.rc == 0
+
+- name: "GitLab post installation: Set root password (first install)"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ gitlab_pods.resources[0].metadata.name }}"
+    command: |
+      gitlab-rails runner "
+      user = User.find_by(username: 'root')
+      user.password = '{{ secret_gitlab_root_password }}'
+      user.password_confirmation = '{{ secret_gitlab_root_password }}'
+      user.save!
+      "
+  register: set_gitlab_root_password
+  failed_when: false
+  when:
+    - gitlab_pods.resources | length > 0
+    - gitlab_initial_password_exists.rc == 0
+    - gitlab_initial_password.stdout is defined
+    - gitlab_initial_password.stdout | trim != ""
+
+- name: "GitLab post installation: Update root password (existing installation or fallback)"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ gitlab_pods.resources[0].metadata.name }}"
+    command: |
+      gitlab-rails runner "
+      user = User.find_by(username: 'root')
+      user.password = '{{ secret_gitlab_root_password }}'
+      user.password_confirmation = '{{ secret_gitlab_root_password }}'
+      user.save!
+      "
+  register: update_gitlab_root_password
+  failed_when: false
+  when:
+    - gitlab_pods.resources | length > 0
+    - >-
+      gitlab_initial_password_exists.rc != 0 or
+      (set_gitlab_root_password is defined and
+      set_gitlab_root_password.rc is defined and
+      set_gitlab_root_password.rc != 0)
+
+- name: "GitLab post installation: Verify password update results"
+  ansible.builtin.debug:
+    msg: |
+      Password update status:
+      - Initial password file exists: {{
+          gitlab_initial_password_exists.rc == 0
+          if gitlab_initial_password_exists is defined
+          else 'unknown' }}
+      - First install password set: {{
+          set_gitlab_root_password.rc == 0
+          if set_gitlab_root_password is defined and
+          set_gitlab_root_password.rc is defined
+          else 'skipped' }}
+      - Existing install password updated: {{
+          update_gitlab_root_password.rc == 0
+          if update_gitlab_root_password is defined and
+          update_gitlab_root_password.rc is defined
+          else 'skipped' }}
+  when: gitlab_pods.resources | length > 0
+
+- name: "GitLab post installation: Remove initial password file (cleanup)"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ gitlab_pods.resources[0].metadata.name }}"
+    command: rm -f /etc/gitlab/initial_root_password
+  register: cleanup_initial_password
+  failed_when: false
+  changed_when: cleanup_initial_password.rc == 0
+  when:
+    - gitlab_pods.resources | length > 0
+    - gitlab_initial_password_exists.rc == 0
+    - set_gitlab_root_password.rc is defined
+    - set_gitlab_root_password.rc == 0

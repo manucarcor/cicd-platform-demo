@@ -1,0 +1,67 @@
+# Ansible
+*.retry
+.tmp/
+*.tmp
+.cache/
+
+# Ansible Vault
+.vault/
+.vault_pass
+inventories/*/group_vars/all/secret.yml
+
+# Python
+*.py[cod]
+__pycache__/
+*.so
+.Python
+env/
+venv/
+.venv/
+.venv-*/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Helm
+*.tgz
+.helm/
+charts/*.tgz
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+*.bak
+
+# Local configuration
+local/
+.terraform/

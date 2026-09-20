@@ -1,0 +1,32 @@
+---
+- name: Cleanup previous installation
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_cleanup.yml"
+  vars:
+    helm_release_name: "{{ jenkins_app_name }}"
+    target_namespace: "{{ jenkins_namespace }}"
+
+- name: Create namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ jenkins_namespace }}"
+    state: present
+
+# Copy TLS certificate secret if TLS is enabled
+- name: Copy TLS certificate
+  ansible.builtin.include_tasks: roles/common_tasks/tasks/create_tls_certificate.yml
+  vars:
+    tls_enabled: "{{ jenkins_tls_enabled | default(false) }}"
+    target_namespace: "{{ jenkins_namespace }}"
+    tls_secret_name: "{{ jenkins_tls_secret_name | default('jenkins-tls-cert') }}"
+  when: jenkins_tls_enabled | default(false) | bool
+
+
+- name: Include tasks helm deploy
+  ansible.builtin.include_tasks: "{{ role_path }}/../common_tasks/tasks/helm_deploy.yml"
+  loop:
+    - name: "{{ jenkins_app_name }}"
+      namespace: "{{ jenkins_namespace }}"
+      chart_ref: "{{ jenkins_chart_ref }}"
+      helm_chart_repository: "{{ jenkins_helm_chart_repository }}"
+      chart_version: "{{ jenkins_chart_version }}"

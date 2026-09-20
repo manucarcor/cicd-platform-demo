@@ -1,0 +1,140 @@
+---
+# Alternative method to get GitLab registration token if the primary method fails
+- name: Alternative - Get registration token via GitLab API with root token
+  block:
+    - name: Create temporary root API token
+      kubernetes.core.k8s_exec:
+        namespace: "{{ gitlab_namespace }}"
+        pod: "{{ detected_gitlab_statefulset }}-0"
+        command: >-
+          gitlab-rails runner -e production "
+          begin
+            user = User.find_by(username: 'root')
+            if user.nil?
+              puts 'ERROR: Root user not found'
+              exit 1
+            end
+
+            # Remove existing ansible token if present
+            existing_token = user.personal_access_tokens.find_by(name: 'ansible-runner-automation')
+            existing_token&.revoke!
+
+            # Create new token
+            token = user.personal_access_tokens.create!(
+              name: 'ansible-runner-automation',
+              scopes: ['api', 'read_api', 'admin_mode'],
+              expires_at: Date.current + 1.hour
+            )
+
+            puts token.token
+          rescue => e
+            puts \"ERROR: #{e.message}\"
+            exit 1
+          end
+          "
+      register: gitlab_root_token_result
+      changed_when: false
+
+    - name: Set root API token
+      ansible.builtin.set_fact:
+        gitlab_temp_root_token: "{{ gitlab_root_token_result.stdout | trim }}"
+      when:
+        - gitlab_root_token_result.stdout is defined
+        - "'ERROR:' not in gitlab_root_token_result.stdout"
+
+    - name: Get registration token via Admin API
+      ansible.builtin.uri:
+        url: "{{ gitlab_url | default('https://gitlab.' + cluster_domain) }}/api/v4/admin/runners"
+        method: GET
+        headers:
+          Private-Token: "{{ gitlab_temp_root_token }}"
+        validate_certs: false
+        status_code: 200
+        timeout: 30
+      register: gitlab_admin_runners_result
+      delegate_to: localhost
+      when: gitlab_temp_root_token is defined
+
+    - name: Extract registration token from API response
+      ansible.builtin.set_fact:
+        gitlab_runner_registration_token: "{{ gitlab_admin_runners_result.json.registration_token }}"
+      when:
+        - gitlab_admin_runners_result is defined
+        - gitlab_admin_runners_result.json is defined
+        - gitlab_admin_runners_result.json.registration_token is defined
+
+    - name: Clean up temporary API token
+      kubernetes.core.k8s_exec:
+        namespace: "{{ gitlab_namespace }}"
+        pod: "{{ detected_gitlab_statefulset }}-0"
+        command: >-
+          gitlab-rails runner -e production "
+          begin
+            user = User.find_by(username: 'root')
+            token = user.personal_access_tokens.find_by(name: 'ansible-runner-automation')
+            token&.revoke!
+            puts 'Token cleaned up successfully'
+          rescue => e
+            puts \"Warning: Failed to clean token: #{e.message}\"
+          end
+          "
+      register: token_cleanup_result
+      changed_when: false
+      ignore_errors: true
+      when: gitlab_temp_root_token is defined
+
+  rescue:
+    - name: Alternative method failed
+      ansible.builtin.debug:
+        msg: "Alternative token retrieval method also failed. Will try manual rails console approach."
+
+# Final fallback - direct database query
+- name: Final fallback - Get token directly from application settings
+  kubernetes.core.k8s_exec:
+    namespace: "{{ gitlab_namespace }}"
+    pod: "{{ detected_gitlab_statefulset }}-0"
+    command: >-
+      gitlab-rails runner -e production "
+      begin
+        # Try different methods to get the token
+        token = nil
+
+        # Method 1: From current settings
+        token = Gitlab::CurrentSettings.current&.runners_registration_token
+
+        # Method 2: From application settings
+        if token.nil? || token.empty?
+          settings = ApplicationSetting.current
+          token = settings&.runners_registration_token if settings
+        end
+
+        # Method 3: Generate new token if none exists
+        if token.nil? || token.empty?
+          settings = ApplicationSetting.current || ApplicationSetting.create_from_defaults
+          token = settings.reset_runners_registration_token!
+          settings.save!
+        end
+
+        if token && !token.empty?
+          puts token
+        else
+          puts 'ERROR: Could not obtain or generate registration token'
+          exit 1
+        end
+      rescue => e
+        puts \"ERROR: #{e.message}\"
+        exit 1
+      end
+      "
+  register: gitlab_token_fallback_result
+  changed_when: false
+  when: gitlab_runner_registration_token is undefined or gitlab_runner_registration_token == ""
+
+- name: Set registration token from fallback method
+  ansible.builtin.set_fact:
+    gitlab_runner_registration_token: "{{ gitlab_token_fallback_result.stdout | trim }}"
+  when:
+    - gitlab_token_fallback_result is defined
+    - gitlab_token_fallback_result.stdout is defined
+    - "'ERROR:' not in gitlab_token_fallback_result.stdout"
+    - gitlab_runner_registration_token is undefined or gitlab_runner_registration_token == ""
