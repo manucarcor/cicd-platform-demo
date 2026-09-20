@@ -68,22 +68,22 @@ RBAC del runner creado, etc.), no solo que Ansible no reportó error.
 
 ```mermaid
 flowchart TB
-    Internet((Cliente / CI))
+    Internet(("Cliente / CI"))
 
     subgraph K8s["Clúster Kubernetes (inventario service-cluster-lab)"]
-        Traefik[Traefik\ningress controller]
+        Traefik["Traefik<br/>ingress controller"]
 
         subgraph NsJenkins["ns: jenkins"]
-            Jenkins[Jenkins]
+            Jenkins["Jenkins"]
         end
         subgraph NsGitlab["ns: gitlab"]
-            GitLab[GitLab CE]
+            GitLab["GitLab CE"]
         end
         subgraph NsRunner["ns: gitlab-runner"]
-            Runner[GitLab Runner]
+            Runner["GitLab Runner"]
         end
         subgraph NsNexus["ns: nexus"]
-            Nexus[Nexus\nartefactos/registry]
+            Nexus["Nexus<br/>artefactos/registry"]
         end
     end
 
@@ -92,19 +92,19 @@ flowchart TB
     Traefik --> GitLab
     Traefik --> Nexus
 
-    Runner -.->|obtiene token vía API\n(automático)| GitLab
+    Runner -.->|"obtiene token vía API<br/>(automático)"| GitLab
     Runner -->|ejecuta jobs| K8s
 
-    Ansible[["Ansible\n(Step01 → Step02 → Step03)"]] -->|helm upgrade --install| Traefik
+    Ansible[["Ansible<br/>(Step01 → Step02 → Step03)"]] -->|"helm upgrade --install"| Traefik
     Ansible --> Jenkins
     Ansible --> GitLab
     Ansible --> Runner
     Ansible --> Nexus
-    Ansible -.->|pytest post-deploy| NsJenkins
-    Ansible -.->|pytest post-deploy| NsGitlab
-    Ansible -.->|pytest post-deploy| NsNexus
+    Ansible -.->|"pytest post-deploy"| NsJenkins
+    Ansible -.->|"pytest post-deploy"| NsGitlab
+    Ansible -.->|"pytest post-deploy"| NsNexus
 
-    Nexus -.->|charts Helm internos| Ansible
+    Nexus -.->|"charts Helm internos"| Ansible
 ```
 
 ---
